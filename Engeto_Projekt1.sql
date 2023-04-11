@@ -92,7 +92,7 @@ JOIN economies e
 SELECT *
 FROM t_lubos_polak_project_sql_primary_final tlppspf ;
 
--- nakonec vymažu pomocné tabulky:
+-- nakonec vymažu pomocné tabulky (tabulku *_prices využívám v úkolu 4):
 DROP TABLE t_lubos_polak_project_sql_prices;
 DROP TABLE t_lubos_polak_project_sql_wages;
 
@@ -103,15 +103,15 @@ DROP TABLE t_lubos_polak_project_sql_wages;
  */
 
 SELECT
-	year,
+	`year`,
 	industry_branch_code,
 	industry_branch_name,
 	average_wage,
 	average_wage - lag(average_wage)
-		OVER (PARTITION BY `industry_branch_code` ORDER BY `year`) AS difference
+		OVER (PARTITION BY industry_branch_code ORDER BY `year`) AS difference
 FROM t_lubos_polak_project_sql_primary_final tlpf
-GROUP BY YEAR, industry_branch_code 
-ORDER BY industry_branch_code, year 
+GROUP BY `year`, industry_branch_code 
+ORDER BY industry_branch_code, `year` 
 ;
 
 
@@ -120,9 +120,9 @@ ORDER BY industry_branch_code, year
  */
 
 SELECT
-	year,
+	`year`,
 	industry_branch_name,
-	round (average_wage/product_price, 1) AS litres_of_milk_for_average_wage
+	round (average_wage/product_price, 1) AS litres_of_milk_for_avg_wage
 FROM t_lubos_polak_project_sql_primary_final
 WHERE (YEAR = (SELECT min(`year`) 
 		FROM t_lubos_polak_project_sql_primary_final)
@@ -135,9 +135,9 @@ ORDER BY industry_branch_name
 ;
 
 SELECT
-	year,
+	`year`,
 	industry_branch_name,
-	round (average_wage/product_price, 1) AS kilograms_of_bread_for_average_wage
+	round (average_wage/product_price, 1) AS kilograms_of_bread_for_avg_wage
 FROM t_lubos_polak_project_sql_primary_final
 WHERE (
 	YEAR = (SELECT min(`year`) 
@@ -156,9 +156,9 @@ ORDER BY industry_branch_name
 
 SELECT
 	product_name,
-	round(avg(product_price), 2) AS average_price,
+	round(avg(product_price), 2) AS avg_price,
 	round(max(product_price), 2) AS max_price,
-	concat (round((100 - avg(product_price)/max(product_price)*100), 1), '%') AS average_growth
+	concat (round((100 - avg(product_price)/max(product_price)*100), 1), '%') AS avg_growth
 FROM t_lubos_polak_project_sql_primary_final tlpf
 GROUP BY product_name
 ORDER BY avg(product_price)/max(product_price) DESC
@@ -172,7 +172,38 @@ ORDER BY avg(product_price)/max(product_price) DESC
  */
 
 
-SELECT * FROM t_lubos_polak_project_sql_primary_final tlpf
+SELECT
+	tlpf.`year`,
+	tlpf.industry_branch_name,
+	round((tlpf.average_wage - lag(tlpf.average_wage) OVER (PARTITION BY tlpf.industry_branch_code ORDER BY tlpf.`year`))
+		/
+		((lag(tlpf.average_wage) OVER (PARTITION BY tlpf.industry_branch_code ORDER BY tlpf.`year`))/100), 2) 
+		AS annual_percentage_change_in_wages,
+	t2.annual_percentage_change_in_prices,
+	abs(round((tlpf.average_wage - lag(tlpf.average_wage) OVER (PARTITION BY tlpf.industry_branch_code ORDER BY tlpf.`year`))
+		/
+		((lag(tlpf.average_wage) OVER (PARTITION BY tlpf.industry_branch_code ORDER BY tlpf.`year`))/100), 2)  - t2.annual_percentage_change_in_prices)
+		AS percentage_changes_difference
+FROM t_lubos_polak_project_sql_primary_final tlpf
+CROSS JOIN (
+			SELECT
+				`year`,
+				round(avg (tlpp.product_price), 2) AS avg_basket_price,
+				round((avg(tlpp.product_price) - lag(avg(tlpp.product_price)) OVER (PARTITION BY tlpp.category_code ORDER BY `year`))
+				/
+				((lag(avg(tlpp.product_price)) OVER (PARTITION BY tlpp.category_code ORDER BY `year`))/100), 2)
+				AS annual_percentage_change_in_prices
+			FROM t_lubos_polak_project_sql_prices tlpp
+			GROUP BY `year` 
+			) t2
+WHERE tlpf.`year` = t2.`year`
+GROUP BY tlpf.`year`, tlpf.industry_branch_code 
+ORDER BY percentage_changes_difference DESC  
+;
+
+-- vzal jsem řešení z úkolu 1, kde jsou vyjádřené rozdíly mezd v letech, dále jsem z dat cen vytvořil spotřebitelský koš (ceny všech produktů z jednoho roku), 
+-- výběry jsem sloučil pomocí skalárního součinu
+
 
 /*
  * úkol 5: Má výška HDP vliv na změny ve mzdách a cenách potravin? Neboli, pokud HDP vzroste výrazněji v jednom roce, 

@@ -6,7 +6,6 @@
 
 CREATE OR REPLACE TABLE t_lubos_polak_project_sql_wages AS
 	SELECT
-		cp.id,
 		cp.payroll_year AS 'year',
 		cp.industry_branch_code,
 		cpib.name AS 'industry_branch_name',
@@ -26,9 +25,9 @@ CREATE OR REPLACE TABLE t_lubos_polak_project_sql_wages AS
 
 CREATE OR REPLACE TABLE t_lubos_polak_project_sql_prices AS
 	SELECT
-		value AS 'product_price',
+		avg(value) AS 'product_price',
 		category_code,
-		year(date_from)
+		year(date_from) AS 'year'
 	FROM czechia_price AS cp
 	WHERE cp.region_code IS NULL
 	GROUP BY 
